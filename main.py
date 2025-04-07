@@ -14,7 +14,7 @@ HTML_TEMPLATE = '''
     <h1>PMID Cluster Visualizer</h1>
     <form method="POST" action="/" enctype="application/x-www-form-urlencoded">
         <textarea name="pmids" rows="6" cols="50" placeholder="Enter PMIDs separated by commas or spaces"></textarea><br><br>
-        <button type="submit">Generate Cluster</button>
+        <button type="submit">Visualize Data</button>
     </form>
     {% if image_ready %}
         <h2>Result:</h2>
@@ -24,23 +24,30 @@ HTML_TEMPLATE = '''
 </html>
 '''
 
-@app.route('/trc.png')
+@app.route('/cluster_image.png')
 def serve_image():
-    return send_file('trc.png', mimetype='image/png')
+    return send_file('cluster_image.png', mimetype='image/png')
 
 @app.route("/", methods=["GET", "POST"])
 def index():
     image_ready = False
+    clear_data()
+
     if request.method == "POST":
+        # Get the PMIDs and clean them
         pmids_raw = request.form.get("pmids", "")
-        pmids = [p.strip() for p in pmids_raw.replace(",", " ").split() if p.strip()]
+
+        cleaned_input = pmids_raw.replace(",", " ")
+        pmid_list = cleaned_input.split()
+        pmids = [p.strip() for p in pmid_list if p.strip()]
 
         if pmids:
-            clear_data()
             collected_pmids = []
             for pmid in pmids:
+                # Avoid duplicates
                 if pmid in collected_pmids:
                     continue
+
                 geo_id = get_geo_id(pmid)
                 if geo_id:
                     gse_id = get_GSE_id(geo_id)
@@ -56,10 +63,9 @@ def index():
 
     return render_template_string(HTML_TEMPLATE, image_ready=image_ready)
 
+# Get dynamic number of clusters based on how many PMIDs were given
 def determine_clusters(num_pmids):
-    if num_pmids == 1:
-        return 1
-    elif num_pmids <= 6:
+    if num_pmids <= 6:
         return 2
     elif num_pmids <= 18:
         return 3

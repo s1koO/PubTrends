@@ -2,16 +2,12 @@ import requests
 import xml.etree.ElementTree as ET
 import os
 import glob
-import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
-from sklearn.metrics import adjusted_rand_score
-import string
-from nltk.corpus import stopwords
-import json
-import re
-import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+import string
+import json
+import matplotlib.pyplot as plt
 from adjustText import adjust_text
 
 # Load data from a JSON file
@@ -25,8 +21,8 @@ def write_data(file, data):
     with open(file, "w", encoding="utf-8") as file:
         json.dump(data, file, indent=4)
 
-def clear_data():
-    with open("geo_datasets.json", "w") as file:
+def clear_data(output_json="articles_data.json"):
+    with open(output_json, "w") as file:
         file.write('{"titles": [], "types": [], "summaries": [], "organisms": [], "designs": []}')
 
 # Give the PMID of an article from PubMed and retrieves the ID of the same article in the GEO database
@@ -107,15 +103,16 @@ def download_soft(GSE_id):
         print(f"Failed to download data for article with id: {GSE_id}")
         return None
 
-    filepath = f"{GSE_id}_data_temp.soft"
+    filepath = f"temp/{GSE_id}_data_temp.soft"
     with open(filepath, "w", encoding="utf-8") as file:
         file.write(response.content.decode("utf-8"))
     return filepath
 
 
-def parse_soft_file(filepath, output_json="geo_datasets.json"):
+def parse_soft_file(filepath, output_json="articles_data.json"):
     if filepath is None:
         return None
+
     # Prepare empty local values
     title = ""
     exp_type = ""
@@ -141,18 +138,8 @@ def parse_soft_file(filepath, output_json="geo_datasets.json"):
     # Join multiple organisms with "; "
     organism_str = ", ".join(organisms)
 
-    # Try to load existing JSON or create new one
-    try:
-        with open(output_json, "r", encoding="utf-8") as f:
-            existing = json.load(f)
-    except (FileNotFoundError, json.decoder.JSONDecodeError):
-        existing = {
-            "titles": [],
-            "types": [],
-            "summaries": [],
-            "organisms": [],
-            "designs": []
-        }
+    with open(output_json, "r", encoding="utf-8") as f:
+        existing = json.load(f)
 
     # Append to JSON structure
     existing["titles"].append(title)
@@ -161,27 +148,30 @@ def parse_soft_file(filepath, output_json="geo_datasets.json"):
     existing["organisms"].append(organism_str)
     existing["designs"].append(design)
 
-    # Write to file
+    # Write to json file
     write_data(output_json, existing)
 
+# Delete the SOFT files
 def delete_soft_files():
-    for file in glob.glob("*_data_temp.soft"):
+    for file in glob.glob("temp/*_data_temp.soft"):
         os.remove(file)
 
+# TF-IDF and clustering on the data
+def tf_idf_clustering(pmids, true_k, output_json="articles_data.json"):
+    titles = load_data(output_json)["titles"]
+    types = load_data(output_json)["types"]
+    summaries = load_data(output_json)["summaries"]
+    organisms = load_data(output_json)["organisms"]
+    designs = load_data(output_json)["designs"]
 
-def tf_idf_clustering(pmids, true_k):
-    titles = load_data("geo_datasets.json")["titles"]
-    types = load_data("geo_datasets.json")["types"]
-    summaries = load_data("geo_datasets.json")["summaries"]
-    organisms = load_data("geo_datasets.json")["organisms"]
-    designs = load_data("geo_datasets.json")["designs"]
-
+    # Combining the 5 fields into one
     combined_texts = []
     for i in range(len(pmids)):
         combined = f"{titles[i]} {types[i]} {summaries[i]} {organisms[i]} {designs[i]}"
         combined = combined.translate(str.maketrans("", "", string.punctuation))
         combined_texts.append(combined)
 
+    # TF-IDF algorithm
     vectorizer = TfidfVectorizer(
         lowercase=True,
         max_features=100,
@@ -215,7 +205,7 @@ def tf_idf_clustering(pmids, true_k):
     order_centroids = model.cluster_centers_.argsort()[:, ::-1]
     terms = vectorizer.get_feature_names_out()
 
-    with open("results.txt", "w", encoding="utf-8") as file:
+    with open("clusters.txt", "w", encoding="utf-8") as file:
         for i in range(true_k):
             file.write(f"Cluster {i}")
             file.write("\n")
@@ -247,4 +237,4 @@ def tf_idf_clustering(pmids, true_k):
 
     adjust_text(texts, arrowprops=dict(arrowstyle='-', color='gray'))
 
-    plt.savefig("trc.png")
+    plt.savefig("cluster_image.png")
