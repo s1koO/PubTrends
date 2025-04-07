@@ -25,6 +25,10 @@ def write_data(file, data):
     with open(file, "w", encoding="utf-8") as file:
         json.dump(data, file, indent=4)
 
+def clear_data():
+    with open("geo_datasets.json", "w") as file:
+        file.write('{"titles": [], "types": [], "summaries": [], "organisms": [], "designs": []}')
+
 # Give the PMID of an article from PubMed and retrieves the ID of the same article in the GEO database
 def get_geo_id(pmid):
     elink_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi"
