@@ -7,6 +7,7 @@ PubTrends: Data Insights for Enhanced Paper Relevance
 
 # Prerequisites
 - Python 3.x
+- Pip installed
 - Additional python packages
 
 # Installation
